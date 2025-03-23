@@ -12,7 +12,7 @@
    [net.cgrand.xforms :as x]))
 
 (def main-table-name "health")
-(def main-parquet-file-name "health.parquet")
+(def main-parquet-file-name "health.parquet-")
 
 (defonce state (rg/atom {:uploaded-files nil}))
 
@@ -121,9 +121,8 @@
                                (:old
                                 (swap! lock
                                        (fn [{:keys [wp wjob] :as x}]
-                                         ;; ok swap isn't blocking like i thought..
+                                         ;; ok swap isn't blocking like i thought.
                                          ;; this happens before lock is reset
-
                                          {:locked? false
                                           :old x})))]
                            (when wp
@@ -176,11 +175,6 @@ order by nrecords desc
                (if (some :selected? opts)
                  opts
                  (assoc-in opts [0 :selected?] true)))))))
-
-(comment
-
-  (js/Date.)
-  )
 
 (defn fetch-data [{:as args :keys [agg-type a_sourceName a_type]
                    [tstart tend] :time-slice}]
@@ -483,79 +477,6 @@ select
 (defonce worker13
   (worker-start!))
 
-(comment
-
-  (p/let [r (kduck/exec "select min(a_startDate) earliest, max(a_endDate) latest from workout")]
-    (klog r))
-  (kduck/pq "select min(a_startDate) mindate, max(a_endDate) maxdate from workout")
-
-  (-> @state :uploaded-files first (.-name))
-
-  (parse-file! (-> @state :uploaded-files first)
-               "health2")
-
-  (kduck/pq "describe tables")
-
-  (kduck/pq "
-select a_value, a_creationDate, a_startDate, a_endDate
-from record
-join workout on
-
-where a_type = 'HKQuantityTypeIdentifierHeartRate'
-and workout_id = 3104639
-order by a_startDate desc
-limit 30
-")
-
-
-
-
-
-
-
-  (kduck/pq "SELECT STRPTIME('2024-11-16 14:42:35 -0800', '%Y-%m-%d %H:%M:%S %z') AS ts;")
-
-  (kduck/pq "select a_value::decimal(10, 2) val, line_num from record
-where a_type = 'HKQuantityTypeIdentifierHeartRate'
-limit 10
-")
-
-  (kduck/pq "describe tables")
-
-  (kduck/pq "select * from health limit 5")
-
-  (kduck/pq "create table demo as select * from health order by line_")
-  (local-f-save! )
-
-  (p/let [x
-          (kduck/pq "
-select a_sourceName, a_type, count(*) nrecords
-from record
-group by a_sourceName, a_type
-order by nrecords desc
-")]
-    (def testx (first x))
-    (klog "got thing" (first x)))
-
-
-  (agg-selector-parse!)
-
-  (let [[x1 x2]
-        (-> @state
-            :graph
-            :domain)]
-    (- x2 x1))
-
-
-  (-> @state :graph :prev-data keys)
-
-
-
-
-  (apply str (repeat 5 "."))
-
-  (mod 6 5)
-  )
 
 (defn loading-ind []
   (rg/with-let [i (rg/atom 0)]
@@ -587,15 +508,8 @@ order by nrecords desc
      ^{:key text}
      [:option {:value text} text])])
 
-;; call
-;; "select min(a_startDate) mindate, max(a_endDate) maxdate from workout"
-;; containerselector #id-for-div
 (def demo-loaded?-ref (rg/cursor state [:demo-loaded?]))
 
-(+ (.getTime (js/Date.)) (.getTime (js/Date.)))
-
-;; want to split timespace into segments
-;; but then like every segment should be partitioned into 2, and increment by 1 partition
 (defn graph-1 [{:keys [cref gid width height]}]
   (rg/with-let [base-args {:width  width
                            :height height}
@@ -719,7 +633,9 @@ order by nrecords desc
                 (status-set! :msg "no file uploaded. loading demo data.")
                 (reset! demo-loaded?-ref true)
                 (demo-file-load!)))
-          _ (status-set! :msg "file loaded, reading data")
+          _ (status-set! :msg "loading duckdb")
+          _ (kduck/query-array "select 1")
+          _ (status-set! :msg "file+duck loaded. reading data")
           _ (setup-db-from-health-parquet! (if main-exists?
                                              main-parquet-file-name
                                              demo-file-name))]
@@ -729,7 +645,6 @@ order by nrecords desc
   (rg/with-let [table-dl-link (rg/atom "")
                 _ (init-script)]
     [:<>
-     [:div "select apple health 'export.zip' file:"]
      [:input {:accept ".zip"
               :type "file"
               :on-change (fn [e]
@@ -750,25 +665,12 @@ order by nrecords desc
                          (init-script :force-demo? true)
                          (klog "should reload other thing"))}
          "load demo instead"]])
-
-     ;; (when-let [f (-> @state :uploaded-files first)]
-     ;;   [:button {:on-click (fn [e]
-     ;;                         (p/let [_ (parse-file! (-> @state :uploaded-files first) main-table-name)
-     ;;                                 _ (status-set! :msg "saving to local storage")
-     ;;                                 _ (local-f-save! main-parquet-file-name main-table-name)
-     ;;                                 _ (status-set! "saved at " main-parquet-file-name)
-     ;;                                 link (local-f->link main-parquet-file-name)]
-     ;;                           (reset! table-dl-link link))
-     ;;                         )}
-     ;;    (str "parse '" (.-name f) "'")])
-     [:div {:style {:max-width "80ch"}} @status-ref]
+     [:div {:style {:max-width "80ch"}} (or @status-ref "")]
      (when (not-empty @table-dl-link)
        [:div (str "download link:")
         [:a {:href @table-dl-link
              :download "health.parquet"}
          "download!"]])
-     [:br]
-     [:br]
      [:br]
      [dropdown :opts-atom agg-selector-ref]
      [graph]

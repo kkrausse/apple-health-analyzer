@@ -676,6 +676,7 @@ select
                                  true
                                  )
                                (fn [e]
+                                 (klog "error loading!" e)
                                  (status-set! :msg (str "failed loading: " e)))))}]
      #_
      (if @loaded-id-ref

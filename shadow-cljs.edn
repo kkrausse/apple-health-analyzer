@@ -1,0 +1,23 @@
+{:deps {:aliases [:cljs]}
+ :dev-http {8000 {:root      "public"
+                  ;; file server url from docker-compose hosting notes
+                  ;; :proxy-url "http://localhost:8080"
+                  }}
+ :builds
+ {:app {:target           :browser
+        :output-dir       "public/js"
+        :asset-path       "/js"
+        :js-options       {:js-provider :shadow}
+        :compiler-options {:optimizations      :advanced
+                           :output-feature-set :es2020}
+        :modules          {:shared
+                           {:entries []}
+                           :main   {:init-fn    apple-health-analyzer.main/init
+                                    :depends-on #{:shared}}
+                           :loader {:init-fn    apple-health-analyzer.parse-worker/init
+                                    :depends-on #{:shared}
+                                    :web-worker true}}
+        :devtools         {:watch-dir       "public"
+                           :reload-strategy "full"}
+        :release          {:output-dir "docs/js"
+                           :asset-path "/js"}}}}

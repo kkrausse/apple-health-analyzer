@@ -1,0 +1,15 @@
+/node_modules
+.DS_Store
+.lsp/
+.nrepl-port
+.clj-kondo/*/
+public/js
+.cpcache
+.shadow-cljs
+yarn.lock
+report.html
+# this should be a build artifact
+/resources/public
+deploy/target/
+
+/public/db.edn

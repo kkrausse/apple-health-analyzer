@@ -1,0 +1,65 @@
+* apple health analyzer
+
+An entirely in-browser way to analyze apple health data.
+
+how it works
+- select apple heath =export.zip= file
+- it will parse it and load to an in-browser database
+- download health.parquet of all your data
+
+** todo
+- [ ] clean demo data
+- [X] demo idicator, use by default
+- [X] fix hardcoded mile split thing
+- [X] fix scroll issues scroll in more!
+- [X] fix big data
+- [X] individual data query
+- [X] reload js graph data update?
+- [ ] cache the dumb data!
+- [-] selectors for data
+  - [X]  data source
+  - [X] accum value
+  - [ ]  accum fn
+- [ ] better scrunching of graph so their closer together
+  - 1 workout = 1 day?
+  - i think thins is ok actually
+- [ ] incremental loading -- won't work for workout
+- [ ] other features
+  - [ ] click to compare
+  - [ ] duck terminal
+  - [ ] multi-worker fast parsing
+** mega prompt to create graph
+
+I want you to make a graph in plain javascript which i can paste inside a <body> on an html page. sample data pasted below for both mile aggregates & individual data.
+for the graph,
+- should be a bar graph
+- should be able to zoom in and zoom back out. also want zoom buttons and to be able to scroll side to side
+- x axis should be time
+- when you zoom out past a certain amount, it should show aggregates instead of the detail values
+  - so there should maybe be like a callback to get the detail values with the date range in question
+- the a_type should be swappable. but for now, fine to hardcode as "HKQuantityTypeIdentifierHeartRate"
+- hardcode the sample data for now, but wrap in an async callback that'd be able to fetch the data
+- i want to be able to hover over the bars and have it show a small description of which data point I'm looking at
+- use d3.js
+
+sample data for individual datapoints
+
+[{"workout_id":"3104678","workout_start":"2025-01-25 09:10:24","mile":0,"a_type":"HKQuantityTypeIdentifierHeartRate","a_value":"144","a_startDate":"2025-01-25 09:16:10","a_endDate":"2025-01-25 09:16:10"},
+{"workout_id":"3104678","workout_start":"2025-01-25 09:10:24","mile":0,"a_type":"HKQuantityTypeIdentifierHeartRate","a_value":"142","a_startDate":"2025-01-25 09:20:08","a_endDate":"2025-01-25 09:20:08"},
+{"workout_id":"3104678","workout_start":"2025-01-25 09:10:24","mile":0,"a_type":"HKQuantityTypeIdentifierHeartRate","a_value":"152","a_startDate":"2025-01-25 09:13:48","a_endDate":"2025-01-25 09:13:48"},
+{"workout_id":"3104678","workout_start":"2025-01-25 09:10:24","mile":2,"a_type":"HKQuantityTypeIdentifierHeartRate","a_value":"138","a_startDate":"2025-01-25 09:43:39","a_endDate":"2025-01-25 09:43:39"},
+{"workout_id":"3104678","workout_start":"2025-01-25 09:10:24","mile":2,"a_type":"HKQuantityTypeIdentifierHeartRate","a_value":"137","a_startDate":"2025-01-25 09:36:33","a_endDate":"2025-01-25 09:36:33"},
+{"workout_id":"3104678","workout_start":"2025-01-25 09:10:24","mile":4,"a_type":"HKQuantityTypeIdentifierHeartRate","a_value":"154","a_startDate":"2025-01-25 10:14:09","a_endDate":"2025-01-25 10:14:09"},
+{"workout_id":"3104678","workout_start":"2025-01-25 09:10:24","mile":5,"a_type":"HKQuantityTypeIdentifierHeartRate","a_value":"136","a_startDate":"2025-01-25 10:25:30","a_endDate":"2025-01-25 10:25:30"},
+{"workout_id":"3104639","workout_start":"2025-01-24 16:25:19","mile":0,"a_type":"HKQuantityTypeIdentifierHeartRate","a_value":"158","a_startDate":"2025-01-24 16:32:15","a_endDate":"2025-01-24 16:32:15"}]
+
+aggregate per mile data shape
+
+[{"workout_id":"3104678","workout_start":"2025-01-25 09:10:24","mile":0,"a_type":"HKQuantityTypeIdentifierHeartRate","agg_value":146.0},
+{"workout_id":"3104678","workout_start":"2025-01-25 09:10:24","mile":2,"a_type":"HKQuantityTypeIdentifierHeartRate","agg_value":137.5},
+{"workout_id":"3104678","workout_start":"2025-01-25 09:10:24","mile":4,"a_type":"HKQuantityTypeIdentifierHeartRate","agg_value":154.0},
+{"workout_id":"3104678","workout_start":"2025-01-25 09:10:24","mile":5,"a_type":"HKQuantityTypeIdentifierHeartRate","agg_value":136.0},
+{"workout_id":"3104639","workout_start":"2025-01-24 16:25:19","mile":0,"a_type":"HKQuantityTypeIdentifierHeartRate","agg_value":158.0},
+{"workout_id":"3104593","workout_start":"2025-01-23 07:11:39","mile":0,"a_type":"HKQuantityTypeIdentifierHeartRate","agg_value":164.9375},
+{"workout_id":"3104593","workout_start":"2025-01-23 07:11:39","mile":1,"a_type":"HKQuantityTypeIdentifierHeartRate","agg_value":163.11320754716982},
+{"workout_id":"3104593","workout_start":"2025-01-23 07:11:39","mile":2,"a_type":"HKQuantityTypeIdentifierHeartRate","agg_value":156.8654970760234}]

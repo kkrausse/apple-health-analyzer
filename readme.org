@@ -3,12 +3,31 @@
 An entirely in-browser way to analyze apple health data.
 
 how it works
+- (optionally) incognito tab + airplane mode
 - select apple heath =export.zip= file
-- it will parse it and load to an in-browser database
+- parse it and load to an in-browser database (duckdb)
 - download health.parquet of all your data
+
+expirimental. mostly vibe coded / ai generated graphs.
+
+** build
+
+#+begin_src sh
+rm public/js
+cp -r public/* docs/
+clj -M:cljs:shadow release :app
+#+end_src
+
+** development
+
+google's closure compiler doesn't handle some of the syntax for apache-arrow, so had to hack a couple spots in the node modules
+
+npm install
+& see .dir-locals.el for dev script
 
 ** todo
 - [ ] clean demo data
+- [ ] disclaimer / descriptions / about part
 - [X] demo idicator, use by default
 - [X] fix hardcoded mile split thing
 - [X] fix scroll issues scroll in more!

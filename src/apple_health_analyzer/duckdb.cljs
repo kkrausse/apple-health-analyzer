@@ -3,7 +3,7 @@
    ["@duckdb/duckdb-wasm" :as duckdb]
    [promesa.core :as p]))
 
-(def db
+(defonce db
   (p/let [bundle
           (duckdb/selectBundle (clj->js
                                 {:eh {
@@ -26,7 +26,7 @@
     (js/console.log "instantiated!")
     db))
 
-(def conn (-> (p/let [d db
+(defonce conn (-> (p/let [d db
                           conn (.connect d)]
                     (js/console.log "connected")
                     conn)

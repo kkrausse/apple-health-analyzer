@@ -5,14 +5,13 @@
    [clojure.core.async :as a]
    ["react-dom/client" :as react-client]
    ["fflate" :as fflate]
-   ["@duckdb/duckdb-wasm" :as duckdb]
    [clojure.string :as str]
    [apple-health-analyzer.duckdb :as kduck]
    ["react" :as react]
    [net.cgrand.xforms :as x]))
 
 (def main-table-name "health")
-(def main-parquet-file-name "health.parquet-")
+(def main-parquet-file-name "health.parquet")
 
 (defonce state (rg/atom {:uploaded-files nil}))
 
@@ -74,6 +73,7 @@
     (js/URL.createObjectURL (js/Blob. (clj->js [b])))))
 
 (def demo-file-name "demo.parquet")
+(def demo-table-name "demo.parquet")
 
 (defn demo-file-load! []
   (p/let [r (js/fetch (str "./" demo-file-name))
@@ -367,7 +367,6 @@ select
 ;
 ")
           ]
-    (p/resolve! @init-donep? true)
     )
   )
 
@@ -440,6 +439,7 @@ select
 
 (defn status-set! [& {:keys [msg]}]
   (reset! status-ref msg)
+  #_
   (p/let [_ (p/delay 6000)]
     (swap! status-ref
            (fn [s]
@@ -508,7 +508,7 @@ select
      ^{:key text}
      [:option {:value text} text])])
 
-(def demo-loaded?-ref (rg/cursor state [:demo-loaded?]))
+(def loaded-id-ref (rg/cursor state [:loaded-id-ref]))
 
 (defn graph-1 [{:keys [cref gid width height]}]
   (rg/with-let [base-args {:width  width
@@ -591,6 +591,7 @@ select
                                                       (swap! init-result assoc :newX newX)
                                                       (reset! range-ref
                                                               (js->clj (.domain newX)))))})))]
+         (klog "ran init graph?")
          (reset! init-result (js->clj initr :keywordize-keys true))
          )
        (fn []))
@@ -604,73 +605,93 @@ select
 
 (defn graph []
   (let [cref   (react/useRef)
-        gid    "graph-container"
+        gid    (str "graph-container-" @loaded-id-ref)
         width  (* 0.9 (.-innerWidth js/window))
         height (* 0.5 (.-innerHeight js/window))
         ]
     [:div
-     [:div {:ref    cref
-            :id     gid
-            :height height
-            :width "100%"
+     ^{:key gid}
+     [:div {:ref      cref
+            :id       gid
+            :height   height
+            :width    "100%"
             :position "relative"
             }]
-     [:div [graph-1 {:cref cref
-                     :gid gid
+     [:div [graph-1 {:cref   cref
+                     :gid    gid
                      :width  width
                      :height height
                      }]]]))
 
 
+(def lock-init (->locking-fn))
+
 (defn init-script [& {:keys [force-demo?]}]
-  (p/let [main-exists? (if force-demo? false (local-file-exists? main-parquet-file-name))
-          _ (if main-exists?
-              (do
-                (status-set! :msg "found previous file. loading that.")
-                (reset! demo-loaded?-ref false)
-                (local-file-load! main-parquet-file-name main-table-name))
-              (do
-                (status-set! :msg "no file uploaded. loading demo data.")
-                (reset! demo-loaded?-ref true)
-                (demo-file-load!)))
-          _ (status-set! :msg "loading duckdb")
-          _ (kduck/query-array "select 1")
-          _ (status-set! :msg "file+duck loaded. reading data")
-          _ (setup-db-from-health-parquet! (if main-exists?
-                                             main-parquet-file-name
-                                             demo-file-name))]
-    true))
+  (lock-init
+   (fn []
+     #_
+     (swap! init-donep? (fn [p]
+                          (klog "promist" p (p/pending? p))
+                          (if (p/pending? p)
+                            p
+                            (p/deferred))))
+     (p/let [main-exists? (if force-demo? false (local-file-exists? main-parquet-file-name))
+             _ (if main-exists?
+                 (do
+                   (status-set! :msg "found previous file. loading that.")
+                   (local-file-load! main-parquet-file-name main-table-name))
+                 (do
+                   (status-set! :msg "no file uploaded. loading demo data.")
+                   (demo-file-load!)))
+             _ (status-set! :msg "loading duckdb")
+             _ (kduck/query-array "select 1")
+             _ (status-set! :msg "file+duck loaded. reading data")
+             _ (setup-db-from-health-parquet! (if main-exists?
+                                                main-parquet-file-name
+                                                demo-file-name))]
+       (reset! loaded-id-ref (gensym (if main-exists? "user_load" "demo_load")))
+       (p/resolve! @init-donep? true)
+       true))))
 
 (defn main-page []
   (rg/with-let [table-dl-link (rg/atom "")
-                _ (init-script)]
+                _ (init-script)
+                ]
     [:<>
      [:input {:accept ".zip"
               :type "file"
               :on-change (fn [e]
                            (load-file! (.. e -target -files))
-                           (p/let [_ (parse-file! (-> @state :uploaded-files first) main-table-name)
-                                   _ (status-set! :msg "saving to local storage")
-                                   _ (local-f-save! main-parquet-file-name main-table-name)
-                                   _ (status-set! :msg (str "saved at " main-parquet-file-name ". creating link & loading data."))
-                                   link (local-f->link main-parquet-file-name)]
-                             (reset! table-dl-link link)))}]
-     (if @demo-loaded?-ref
+                           (p/catch
+                               (p/let [_ (parse-file! (-> @state :uploaded-files first) main-table-name)
+                                       _ (status-set! :msg "saving to local storage")
+                                       _ (local-f-save! main-parquet-file-name main-table-name)
+                                       _ (status-set! :msg (str "saved at " main-parquet-file-name ". creating download link"))
+                                       link (local-f->link main-parquet-file-name)
+                                       _ (reset! table-dl-link link)
+                                       _ (status-set! :msg "loading data")
+                                       _ (init-script)
+                                       _ (status-set! :msg "finished loading data")
+                                       ]
+                                 true
+                                 )
+                               (fn [e]
+                                 (status-set! :msg (str "failed loading: " e)))))}]
+     #_
+     (if @loaded-id-ref
        [:div "using demo data. select apple health `export.zip` file to use your own data"]
        [:div "using local health data. "
         [:a {:href "#"
              :on-click (fn [x]
-                         (reset! init-donep? (p/deferred))
                          (status-set! :msg "loading demo")
-                         (init-script :force-demo? true)
-                         (klog "should reload other thing"))}
+                         (init-script :force-demo? true))}
          "load demo instead"]])
      [:div {:style {:max-width "80ch"}} (or @status-ref "")]
      (when (not-empty @table-dl-link)
        [:div (str "download link:")
         [:a {:href @table-dl-link
              :download "health.parquet"}
-         "download!"]])
+         main-parquet-file-name]])
      [:br]
      [dropdown :opts-atom agg-selector-ref]
      [graph]
